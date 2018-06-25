@@ -1,32 +1,79 @@
-function observe(data) {
-    if (!data || typeof data !== 'object') {
-        return;
+function observe(value, asRootData) {
+    if (!value || typeof value !== 'object') {
+        return
     }
-    Object.keys(data).forEach(key => {
-        observeProperty(data, key, data[key])
-    })
+    return new Observer(value)
 }
 
-function observeProperty(obj, key, val) {
-    console.log(val)
-    observe(val)
-    Object.defineProperty(obj, key, {
-        enumerable: true,
-        configurable: true,
-        get: function () {
-            return val
-        },
-        set: function (newVal) {
-            if (val === newVal || (newVal && val !== val)) {
-                return;
+function Observer(value) {
+    this.value = value;
+    this.walk(value);
+}
+
+Observer.prototype = {
+    walk: function (obj) {
+        let self = this;
+        Object.keys(obj).forEach(key => {
+            self.observeProperty(obj, key, obj[key])
+        })
+    },
+    observeProperty: function (obj, key, val) {
+        let dep = new Dep()
+        let childOb = observe(val)
+        Object.defineProperty(obj, key, {
+            enumerable: true,
+            cinfigurable: true,
+            get: function () {
+                if (Dep.target) {
+                    dep.depend()
+                }
+                if (childOb) {
+                    childOb.dep.depend()
+                }
+                return val
+            },
+            set: function (newVal) {
+                if (val === newVal || newVal !== val) {
+                    return
+                }
+                val = newVal
+                childOb = observe(newVal)
+                dep.notify()
             }
-            console.log('数据更新啦', val , '=>', newVal);
-            val = newVal;
-        }
-    })
+        })
+    }
+}
+let uid = 0;
+
+function Dep() {
+    this.id = uid++
+    this.subs = []
 }
 
-var data = {
-    a: 'hello'
+Dep.target = null
+Dep.prototype = {
+    addSub: function (sub) {
+        this.subs.push(sub)
+    },
+    removeSub: function (sub) {
+        let index = this.subs.indexOf(sub)
+        if (index !== -1) {
+            this.subs.splice(index, 1)
+        }
+    },
+    //通知数据变更
+    notify: function () {
+        this.subs.forEach(sub => {
+            sub.update()
+        })
+    },
+    //添加watcher
+    depend: function () {
+        Dep.target.addDep(this)
+    }
 }
-observe(data)
+
+var obj = {
+    a: 'b'
+}
+observe(obj)
